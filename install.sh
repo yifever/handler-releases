@@ -21,7 +21,15 @@ if [ -z "$VERSION" ]; then
       VERSION="latest"
       ;;
     nightly)
-      VERSION="nightly"
+      # Find the latest nightly release (format: nightly-YYYYMMDD-vN)
+      VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" | \
+        grep -o '"tag_name": "nightly-[^"]*"' | \
+        head -1 | \
+        sed 's/"tag_name": "//;s/"$//')
+      if [ -z "$VERSION" ]; then
+        echo "Error: Could not find a nightly release."
+        exit 1
+      fi
       ;;
     *)
       echo "Error: Unknown channel '$CHANNEL'. Use 'stable' or 'nightly'."
