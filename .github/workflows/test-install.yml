@@ -1,0 +1,60 @@
+name: Test Install Script
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger for testing
+
+jobs:
+  test-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest      # macOS ARM64 (Apple Silicon)
+            name: macOS ARM64
+          - os: macos-13          # macOS x86_64 (Intel)
+            name: macOS x86_64
+          - os: ubuntu-latest     # Linux x86_64
+            name: Linux x86_64
+          # Note: Linux ARM64 requires self-hosted runner or QEMU
+          # Skipping for now as GitHub doesn't provide ARM64 Linux runners
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+
+    steps:
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
+
+      - name: Install tmux (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux
+
+      - name: Run install script
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/yifever/handler-releases/main/install.sh | sh
+
+      - name: Verify installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          which handler
+          handler --version || handler --help || echo "Handler installed (no version flag)"
+
+      - name: Test handler starts
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          # Start handler in background and check it doesn't crash immediately
+          timeout 5 handler || exit_code=$?
+          # timeout returns 124 if command times out (expected), other codes are failures
+          if [ "${exit_code:-0}" -eq 124 ]; then
+            echo "Handler started successfully (timed out as expected)"
+          elif [ "${exit_code:-0}" -eq 0 ]; then
+            echo "Handler exited cleanly"
+          else
+            echo "Handler failed to start with exit code: $exit_code"
+            exit 1
+          fi
