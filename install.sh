@@ -18,7 +18,16 @@ INSTALL_DIR="${HANDLER_INSTALL_DIR:-$HOME/.local/bin}"
 if [ -z "$VERSION" ]; then
   case "$CHANNEL" in
     stable)
-      VERSION="latest"
+      # Find the latest stable release (format: vX.Y.Z, non-prerelease)
+      VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | \
+        grep -o '"tag_name": "[^"]*"' | \
+        head -1 | \
+        sed 's/"tag_name": "//;s/"$//')
+      if [ -z "$VERSION" ]; then
+        echo "Error: No stable release found. Try nightly channel:"
+        echo "  HANDLER_CHANNEL=nightly curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh"
+        exit 1
+      fi
       ;;
     nightly)
       # Find the latest nightly release (format: nightly-YYYYMMDD-vN)
@@ -64,11 +73,7 @@ esac
 FILENAME="handler-${OS}-${ARCH}.tar.gz"
 
 # Build download URL
-if [ "$VERSION" = "latest" ]; then
-  DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$FILENAME"
-else
-  DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
-fi
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
 
 echo "Installing Handler..."
 echo "  OS: $OS"
